@@ -1,0 +1,37 @@
+{
+  "protocol": "mojian-sync/v1",
+  "utf8": "hello",
+  "hash": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+  "commit": {
+    "workspaceId": "fixture-workspace-0001",
+    "deviceId": "fixture-device-0001",
+    "operationId": "fixture-operation-0001",
+    "changes": [
+      { "path": "notebooks/wirebook/pages/wirepage.json", "expectedVersion": 0, "hash": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" }
+    ]
+  },
+  "receipt": {
+    "workspaceId": "fixture-workspace-0001",
+    "operationId": "fixture-operation-0001",
+    "revision": 1,
+    "files": {
+      "notebooks/wirebook/pages/wirepage.json": { "hash": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "version": 1 }
+    }
+  },
+  "deletion": {
+    "workspaceId": "fixture-workspace-0001",
+    "deviceId": "fixture-device-0001",
+    "operationId": "fixture-operation-0002",
+    "changes": [
+      { "path": "notebooks/wirebook/pages/wirepage.json", "expectedVersion": 1, "hash": null }
+    ]
+  },
+  "deletionReceipt": {
+    "workspaceId": "fixture-workspace-0001",
+    "operationId": "fixture-operation-0002",
+    "revision": 2,
+    "files": {
+      "notebooks/wirebook/pages/wirepage.json": { "hash": null, "version": 2 }
+    }
+  }
+}

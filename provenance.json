@@ -1,0 +1,19 @@
+{
+  "package": "@alexbeatsz/file-sync-core",
+  "version": "0.1.0",
+  "license": "MIT",
+  "sources": [
+    {
+      "repository": "https://github.com/AlexbeatsZ/Mojian",
+      "commit": "dc63bcea0db5d967a48d500305ab50d8c2588bf4",
+      "paths": ["sync-server/server.mjs", "sync-server/test/fixtures/v1-wire.json"],
+      "licenseBasis": "Author-authorized MIT extraction"
+    },
+    {
+      "repository": "https://github.com/AlexbeatsZ/webobsidian",
+      "commit": "4234492629e056624a6f760bde2a4755fc26a907",
+      "paths": ["sync-server/server.mjs", "sync-server/protocol.mjs"],
+      "licenseBasis": "MIT; Copyright (c) 2026 xnohat retained"
+    }
+  ]
+}
