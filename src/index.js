@@ -8,6 +8,8 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { getSystemErrorMap } from 'node:util';
+import { createPageHandler } from './pages.js';
+import { byteRange, createUploadHandler } from './uploads.js';
 
 export const hashPattern = /^[a-f0-9]{64}(?![\s\S])/;
 export const idPattern = /^[A-Za-z0-9_-]{16,80}(?![\s\S])/;
@@ -176,6 +178,8 @@ export async function createFileSyncServer(options) {
     throw error;
   }
 
+  const pages = createPageHandler(root, checkManifest);
+  const uploads = createUploadHandler(root, maxBlobBytes, atomicJson, syncDirectory);
   let commits = Promise.resolve();
   let storageFailed = false;
   let closing = false;
@@ -216,6 +220,22 @@ export async function createFileSyncServer(options) {
         json(response, 200, state.manifest);
         return;
       }
+      if (request.method === 'GET') {
+        if (url.pathname === `${routePrefix}/manifest/pages`) {
+          await pages('manifest', url.searchParams, state.manifest, response, json);
+          return;
+        }
+        if (url.pathname === `${routePrefix}/changes`) {
+          await pages('changes', url.searchParams, state.manifest, response, json);
+          return;
+        }
+      }
+      const uploadPrefix = `${routePrefix}/uploads/`;
+      const uploadHash = url.pathname.startsWith(uploadPrefix) ? url.pathname.slice(uploadPrefix.length) : '';
+      if (hashPattern.test(uploadHash) && ['GET', 'PUT'].includes(request.method)) {
+        await uploads(request, response, uploadHash, json);
+        return;
+      }
       const blobPrefix = `${routePrefix}/blobs/`;
       const blobHash = url.pathname.startsWith(blobPrefix) ? url.pathname.slice(blobPrefix.length) : '';
       if (hashPattern.test(blobHash)) {
@@ -228,8 +248,20 @@ export async function createFileSyncServer(options) {
             json(response, 404, { error: 'blob_missing' });
             return;
           }
-          response.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': size, 'Cache-Control': 'no-store' });
-          await pipeline(createReadStream(blobPath), response);
+          const rangeHeader = request.headers.range;
+          const range = rangeHeader ? byteRange(rangeHeader, size) : null;
+          const headers = { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'Accept-Ranges': 'bytes' };
+          if (rangeHeader && !range) {
+            response.writeHead(416, { 'Content-Range': `bytes */${size}`, 'Cache-Control': 'no-store' }).end();
+            return;
+          }
+          if (range) {
+            response.writeHead(206, {
+              ...headers, 'Content-Length': range.end - range.start + 1,
+              'Content-Range': `bytes ${range.start}-${range.end}/${size}`,
+            });
+          } else response.writeHead(200, { ...headers, 'Content-Length': size });
+          await pipeline(createReadStream(blobPath, range ?? undefined), response);
           return;
         }
         if (request.method === 'PUT') {

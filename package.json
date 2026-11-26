@@ -1,6 +1,6 @@
 {
   "name": "@alexbeatsz/file-sync-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Zero-dependency durable file synchronization server core",
   "author": "AlexbeatsZ",
   "repository": {
@@ -10,11 +10,13 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./sync-golden-traces.json": "./test/fixtures/sync-golden-traces.json"
   },
   "files": [
     "src",
     "docs/design/api.md",
+    "test/fixtures/sync-golden-traces.json",
     "provenance.json",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"

@@ -94,3 +94,71 @@ Verification: 26/26 isolated Node regressions on Windows / Node24.14.1, includin
 Mojian state compatibility, real process crash/restart, I/O faults before/after state publication,
 and concurrent dead-lock reclamation. Standard TGZ passes offline npm ci and a real package-export
 HTTP commit. Node22/POSIX/physical power-loss behavior is not independently verified.
+
+## Optional transport extensions in 0.2.0
+
+The routes below share the existing authenticated `routePrefix`. Legacy requests
+continue to use the original JSON and write semantics. Consumers that reject query
+strings in their request hook must explicitly allow them on the two exact paging
+routes. A 404 on the first paging request supports fallback to the original manifest
+endpoint. Other errors keep their ordinary transport and recovery meanings.
+
+### Snapshot and changes
+
+- `GET /manifest/pages?limit=500` starts a full snapshot. `GET /changes?since=R&limit=500`
+  instead returns each changed path's latest entry in `(R, revision]`, including tombstones.
+  Entries use v1's path keys and `{hash,version}` values. `limit` is optional, 1–1000.
+- The successful body is `{workspaceId,revision,files,nextCursor}`. The first page fixes
+  identity, revision and sorted path order. An empty/final page has `nextCursor:null`.
+  Continue at the same route with only `?cursor=TOKEN`. Replaying a valid cursor yields
+  the same page even after concurrent commits. Cursors expire after restart, 15 minutes of
+  inactivity or eviction from the 32 retained snapshots. A forged, expired or cross-mode
+  cursor returns 410 `cursor_expired`. Missing history for an initial delta returns the
+  same result. The caller may recover with a fresh full snapshot and exact outbox replay.
+- A future base gets 409 `revision_ahead` and the server revision. An invalid parameter
+  gets 400 `invalid_page_request`. A damaged historical boundary is a server storage
+  error; the client keeps local records and reports the failed operation.
+- Verify workspace identity before processing any page. Persist page work and its
+  continuation atomically. Update the continuous accounted revision only after the last
+  page, with every affected item durable, including pending and blocked work. Individual
+  paths advance their applied bases when applied or confirmed. Full snapshots are sorted
+  once per session, historical boundary validation reads one snapshot on the first delta
+  page, and continuation does not scan disk history.
+
+### Blob ranges and resumable upload
+
+- Legacy `GET /blobs/<hash>` accepts a single `Range: bytes=N-` or `bytes=N-M` in
+  0.2.0. A satisfiable range returns 206 with `Content-Range`; an invalid or unsatisfiable
+  range returns 416 with `Content-Range: bytes */SIZE`. A normal full GET returns 200
+  and `Accept-Ranges: bytes`. If a legacy server ignores Range and returns 200,
+  the client must replace its local partial copy. Verify the final complete blob digest.
+- `GET /uploads/<hash>` reports `{offset,total,complete}`, including an existing blob
+  uploaded through either API. A missing session returns 404 `upload_missing`. The
+  client may start by PUT, or query when a response was uncertain.
+- `PUT /uploads/<hash>` sends one non-empty chunk, up to 8 MiB, with
+  `Content-Range: bytes START-END/TOTAL` (inclusive end). `TOTAL` is bounded by
+  `maxBlobBytes`. Successful responses use the same progress object. Once the hash is fully
+  published, a retry returns completed progress. Before completion, a stale or out-of-order
+  offset or a different total returns 409 `upload_offset_mismatch` with the stored
+  `offset` and `total`. Use the indicated offset or GET it again after a lost response.
+  400 identifies malformed range or length, 413 exceeds bounds, and 503 `upload_busy`
+  requests a retry. An HTTP 404 on PUT is sufficient for a legacy PUT fallback.
+- Offsets survive restart in additive staging files under `uploads/`. The final byte
+  stream is verified against the requested hash before atomic publication into `blobs/`.
+  A mismatch returns 422 `hash_mismatch` and discards the staging files. The final GET
+  may finish an interrupted publication. Legacy commit sees only published blobs, and
+  zero-length blobs still use the legacy PUT. Incomplete staging may retain disk space;
+  the server does not garbage-collect it. Backups continue to follow manifest and blob
+  references and do not need staging files.
+
+### Cross-language fixtures
+
+Consume the pinned package asset's `@alexbeatsz/file-sync-core/sync-golden-traces.json`
+export or this repository's `test/fixtures/sync-golden-traces.json` at the same revision.
+`schemaVersion:1` contains named traces with initial normalized state and ordered steps.
+A step has an `event` and the affected normalized `expected` projection. The caller
+runs its actual planner or state transition, compares the indicated fields, and retains
+unchanged fields. `plan` cases exercise common path decisions and explicit blockers.
+Fault traces exercise partial conflict resolution and restart, last-page advancement,
+preservation of concurrent file edits, and original outbox replay. Product adapters
+supply real paths, group boundaries and editor integration for these normalized traces.

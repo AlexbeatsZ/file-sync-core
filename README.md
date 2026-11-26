@@ -44,6 +44,11 @@ close and drain those listeners before `service.close()`. Hooks are synchronous.
 `hashPattern` and `idPattern` are also exported. Read [the complete API](docs/design/api.md)
 before adapting an application.
 
+Version 0.2.0 adds stable snapshot/delta pages, ranged reads, and resumable blob
+uploads to the v1 route prefix. Existing clients can keep the original endpoints.
+The package also exports `@alexbeatsz/file-sync-core/sync-golden-traces.json` for
+cross-language client tests.
+
 ## Existing data
 
 Point the wrapper at its existing data directory after stopping the previous writer.
@@ -65,10 +70,10 @@ claim directory and require explicit operator recovery after verifying no writer
 
 ## Pin and bundle
 
-Version 0.1.0 is delivered as the standard `npm pack` archive:
+Version 0.2.0 is delivered as the standard `npm pack` archive:
 
 ```sh
-npm install --save-exact https://github.com/AlexbeatsZ/file-sync-core/releases/download/v0.1.0/alexbeatsz-file-sync-core-0.1.0.tgz
+npm install --save-exact https://github.com/AlexbeatsZ/file-sync-core/releases/download/v0.2.0/alexbeatsz-file-sync-core-0.2.0.tgz
 ```
 
 Commit the consumer's package-lock. An alternative is a GitHub source archive addressed
@@ -84,8 +89,9 @@ This package supplies no CLI, TLS keys, gateway, startup task or production conf
 
 ```sh
 npm test
+mkdir -p artifacts/current
 npm pack --pack-destination artifacts/current
-npm run test:package -- artifacts/current/alexbeatsz-file-sync-core-0.1.0.tgz
+npm run test:package -- artifacts/current/alexbeatsz-file-sync-core-0.2.0.tgz
 ```
 
 All regressions use temporary directories under the OS temporary `.agents` directory.
@@ -95,4 +101,4 @@ local archive in an isolated temporary project, offline with scripts disabled, a
 performs a real authenticated round trip through the public package export.
 
 See [provenance.json](provenance.json), [third-party notices](THIRD_PARTY_NOTICES.md)
-and [the implementation log](docs/log/2026-10.md) for version origins and evidence.
+and [the October log](docs/log/2026-10.md) and [the November log](docs/log/2026-11.md) for version origins and evidence.

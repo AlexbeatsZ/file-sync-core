@@ -1,0 +1,558 @@
+{
+  "schemaVersion": 1,
+  "traces": [
+    {
+      "id": "local-update",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "remote": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "upload",
+            "expectedVersion": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-delete",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": null,
+            "remote": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "upload",
+            "expectedVersion": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "new-path",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": null,
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": null,
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "upload",
+            "expectedVersion": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "remote-update",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": {
+              "version": 3,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "download"
+          }
+        }
+      ]
+    },
+    {
+      "id": "remote-delete",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": {
+              "version": 3,
+              "hash": null
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "download"
+          }
+        }
+      ]
+    },
+    {
+      "id": "concurrent-edit",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "remote": {
+              "version": 3,
+              "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "conflict"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unrelated-blob-is-not-ancestor",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": null,
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": {
+              "version": 3,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "conflict"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unknown-ancestor-tombstone",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": null,
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": {
+              "version": 3,
+              "hash": null
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "conflict"
+          }
+        }
+      ]
+    },
+    {
+      "id": "matching-new-base",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "remote": {
+              "version": 3,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "adopt"
+          }
+        }
+      ]
+    },
+    {
+      "id": "same-base",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "blockedGroups": []
+          },
+          "expected": {
+            "decision": "no_change"
+          }
+        }
+      ]
+    },
+    {
+      "id": "blocked-same-group",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "A",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": {
+              "version": 3,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "blockedGroups": [
+              "A"
+            ]
+          },
+          "expected": {
+            "decision": "blocked"
+          }
+        }
+      ]
+    },
+    {
+      "id": "progress-past-blocked-group",
+      "initial": {},
+      "steps": [
+        {
+          "event": {
+            "type": "plan",
+            "path": "A.md",
+            "group": "B",
+            "base": {
+              "version": 2,
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            "localHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": {
+              "version": 3,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "blockedGroups": [
+              "A"
+            ]
+          },
+          "expected": {
+            "decision": "download"
+          }
+        }
+      ]
+    },
+    {
+      "id": "partial-conflict-restart",
+      "initial": {
+        "seen": 445,
+        "durablyQueuedThrough": 445,
+        "appliedBase": {
+          "A.md": {
+            "version": 445,
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "conflicts": [
+          "A.md",
+          "C.md"
+        ],
+        "incoming": [
+          "B.md"
+        ]
+      },
+      "steps": [
+        {
+          "event": {
+            "type": "resolveConflict",
+            "path": "A.md",
+            "choice": "remote",
+            "remote": {
+              "version": 469,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          },
+          "expected": {
+            "seen": 469,
+            "durablyQueuedThrough": 445,
+            "appliedBase": {
+              "A.md": {
+                "version": 469,
+                "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            },
+            "conflicts": [
+              "C.md"
+            ],
+            "incoming": [
+              "B.md"
+            ]
+          }
+        },
+        {
+          "event": {
+            "type": "restart"
+          },
+          "expected": {
+            "seen": 469,
+            "durablyQueuedThrough": 445,
+            "appliedBase": {
+              "A.md": {
+                "version": 469,
+                "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            },
+            "conflicts": [
+              "C.md"
+            ],
+            "incoming": [
+              "B.md"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "queue-before-promote",
+      "initial": {
+        "seen": 4,
+        "durablyQueuedThrough": 4,
+        "incoming": []
+      },
+      "steps": [
+        {
+          "event": {
+            "type": "discover",
+            "revision": 6,
+            "page": {
+              "A.md": {
+                "version": 5,
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            },
+            "nextCursor": "example-next-page"
+          },
+          "expected": {
+            "seen": 6,
+            "durablyQueuedThrough": 4,
+            "incoming": [
+              "A.md"
+            ]
+          }
+        },
+        {
+          "event": {
+            "type": "restart"
+          },
+          "expected": {
+            "seen": 6,
+            "durablyQueuedThrough": 4,
+            "incoming": [
+              "A.md"
+            ]
+          }
+        },
+        {
+          "event": {
+            "type": "discover",
+            "revision": 6,
+            "page": {
+              "B.md": {
+                "version": 6,
+                "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            },
+            "nextCursor": null
+          },
+          "expected": {
+            "seen": 6,
+            "durablyQueuedThrough": 6,
+            "incoming": [
+              "A.md",
+              "B.md"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "incoming-local-edit",
+      "initial": {
+        "seen": 3,
+        "durablyQueuedThrough": 3,
+        "appliedBase": {
+          "A.md": {
+            "version": 2,
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "incoming": [
+          "A.md"
+        ]
+      },
+      "steps": [
+        {
+          "event": {
+            "type": "applyIncoming",
+            "path": "A.md",
+            "expectedLocalHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "actualLocalHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "remote": {
+              "version": 3,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          },
+          "expected": {
+            "appliedBase": {
+              "A.md": {
+                "version": 2,
+                "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            },
+            "incoming": [],
+            "conflicts": [
+              "A.md"
+            ],
+            "preservedHashes": [
+              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "outbox-response-lost",
+      "initial": {
+        "seen": 5,
+        "durablyQueuedThrough": 5,
+        "appliedBase": {
+          "A.md": {
+            "version": 5,
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "outbox": {
+          "operationId": "operation-example-001",
+          "expectedVersion": 5,
+          "path": "A.md",
+          "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "steps": [
+        {
+          "event": {
+            "type": "responseLost"
+          },
+          "expected": {
+            "outbox": {
+              "operationId": "operation-example-001",
+              "expectedVersion": 5,
+              "path": "A.md",
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        {
+          "event": {
+            "type": "restart"
+          },
+          "expected": {
+            "outbox": {
+              "operationId": "operation-example-001",
+              "expectedVersion": 5,
+              "path": "A.md",
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          }
+        },
+        {
+          "event": {
+            "type": "receipt",
+            "operationId": "operation-example-001",
+            "path": "A.md",
+            "entry": {
+              "version": 6,
+              "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          },
+          "expected": {
+            "outbox": null,
+            "appliedBase": {
+              "A.md": {
+                "version": 6,
+                "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

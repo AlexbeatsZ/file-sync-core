@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const archive = path.resolve(process.argv[2]);
+const expectedVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url))).version;
 const parent = path.join(os.tmpdir(), '.agents');
 await mkdir(parent, { recursive: true });
 const root = await mkdtemp(path.join(parent, 'file-sync-core-package-'));
@@ -27,7 +28,7 @@ try {
   const installed = path.join(root, 'node_modules/@alexbeatsz/file-sync-core');
   const metadata = JSON.parse(await readFile(path.join(installed, 'package.json'), 'utf8'));
   assert.equal(metadata.name, '@alexbeatsz/file-sync-core');
-  assert.equal(metadata.version, '0.1.0');
+  assert.equal(metadata.version, expectedVersion);
   assert.equal(metadata.dependencies, undefined);
   for (const file of ['LICENSE', 'THIRD_PARTY_NOTICES.md', 'provenance.json', 'README.md', 'docs/design/api.md']) {
     assert((await readFile(path.join(installed, file), 'utf8')).length > 0);
@@ -37,7 +38,10 @@ import assert from 'node:assert/strict';
 import {once} from 'node:events';
 import {createFileSyncServer,hashPattern,idPattern} from '@alexbeatsz/file-sync-core';
 import metadata from '@alexbeatsz/file-sync-core/package.json' with {type:'json'};
-assert.equal(metadata.version,'0.1.0');
+import traces from '@alexbeatsz/file-sync-core/sync-golden-traces.json' with {type:'json'};
+assert.equal(metadata.version,${JSON.stringify(expectedVersion)});
+assert.equal(traces.schemaVersion,1);
+assert(traces.traces.some(trace=>trace.id==='partial-conflict-restart'));
 const service=await createFileSyncServer({
   root:'./isolated-data',token:'isolated-package-test',routePrefix:'/test/v1',
   validPath:name=>name==='document.md',validateManifest(){},
@@ -54,6 +58,10 @@ try {
   const response=await fetch(base+'commit',{method:'POST',headers,body:JSON.stringify(body)});
   assert.equal(response.status,200);
   assert.equal((await response.json()).revision,1);
+  const delta=await fetch(base+'changes?since=0',{headers});
+  assert.equal(delta.status,200);
+  assert.deepEqual(await delta.json(),{workspaceId:manifest.workspaceId,revision:1,
+    files:{'document.md':{hash:null,version:1}},nextCursor:null});
 } finally {await service.close();}
 `;
   await writeFile(path.join(root, 'smoke.mjs'), source);
