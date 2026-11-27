@@ -162,6 +162,7 @@ export class BackupRepository {
           await pipeline(createReadStream(source), meter, ...(this.policy.compression ? [createGzip()] : []),
             createWriteStream(temporary, { flags: 'wx', mode: 0o600 }));
           const f = { hash: hash.digest('hex'), size, compressed: this.policy.compression };
+          if (typeof input === 'object' && input.hash !== f.hash) throw new Error('Immutable source digest mismatch');
           const target = path.join(this.root, 'objects', objectName(f));
           try { await stat(target); } catch (e) { if (e.code !== 'ENOENT') throw e; await rename(temporary, target); }
           files[name] = f;

@@ -33,6 +33,7 @@ test('corrupt backup halts pruning and restore rejects traversal', async t => {
   const root = await temporary(t), source = path.join(root, 'file');
   const repo = new BackupRepository(path.join(root, 'backup'));
   await writeFile(source, 'original');
+  await assert.rejects(repo.snapshot({ data: { file: source, hash: 'a'.repeat(64) } }), /digest mismatch/);
   await repo.snapshot({ data: source });
   await assert.rejects(repo.snapshot({ '../escaped': source }));
   const object = (await readdir(path.join(root, 'backup', 'objects')))[0];
