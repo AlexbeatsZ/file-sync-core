@@ -1,13 +1,18 @@
 import path from 'node:path';
 import { BackupRepository, lifecyclePolicy } from './backup.js';
-import { pruneUpgrades, verifyUpgrade } from './upgrade.js';
+import { pruneUpgrades, verifyUpgrade, prepareUpgrade } from './upgrade.js';
 
 /** Product wrappers supply credentials and the original private endpoint, never command-line tokens. */
-export async function lifecycleCli({ root, token, baseUrl, configuration = {} }, args) {
+export async function lifecycleCli({ root, token, baseUrl, configuration = {}, configFile }, args) {
   const [command = 'status', ...rest] = args;
   const policy = lifecyclePolicy(configuration);
   const directory = path.resolve(configuration.backup?.directory ?? root + '-backups');
   const repository = new BackupRepository(directory, policy.backup);
+  if (command === 'upgrade-prepare') {
+    if (!configFile || rest[0] !== '--current' || !rest[1] ||
+        !(rest.length === 2 || rest.length === 4 && rest[2] === '--migration')) throw new Error('upgrade-prepare --current PROGRAM [--migration schema|format|full]');
+    return prepareUpgrade({ root, current: rest[1], configFile, directory: configuration.backup?.upgrade?.directory ?? root + '-upgrades', migration: rest[3] ?? 'code' });
+  }
   if (command === 'restore') {
     if (rest.length !== 3 || rest[1] !== '--destination') throw new Error('restore ID --destination NEW_DIRECTORY');
     return repository.restore(rest[0], path.resolve(rest[2]));

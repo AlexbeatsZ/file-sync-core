@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { mkdir, readFile, writeFile, readdir, utimes, stat } from 'node:fs/promises';
-import { BackupRepository, lifecyclePolicy } from '../src/index.js';
+import { BackupRepository, lifecyclePolicy, prepareUpgrade, verifyUpgrade, pruneUpgrades } from '../src/index.js';
 import { temporary, listen, json, upload, op, change, request, token, pause, digest } from './helpers.js';
 
 test('backup deduplicates, rotates calendar buckets, preserves pinned points and restores exact bytes', async t => {
@@ -123,4 +123,19 @@ test('an active upload of an old uncommitted hash is protected throughout GC', a
   } finally { finish(); }
   assert.equal((await put).status, 200);
   assert.equal(hash, digest(bytes));
+});
+
+test('normal upgrade snapshots only program/config, refuses an active writer and expires verified rollback points', async t => {
+  const parent = await temporary(t), root = path.join(parent, 'live'), current = path.join(parent, 'program'), configFile = path.join(parent, 'server.json');
+  await mkdir(current); await writeFile(path.join(current, 'program.js'), 'old code'); await writeFile(configFile, '{}');
+  const service = await listen(t, root);
+  await assert.rejects(prepareUpgrade({ root, current, configFile }), /Stop/);
+  await service.close();
+  const first = await prepareUpgrade({ root, current, configFile });
+  assert(!((await readdir(first.prepared)).includes('data')));
+  assert.equal(await readFile(path.join(first.prepared, 'program/program.js'), 'utf8'), 'old code');
+  assert.equal((await pruneUpgrades(root + '-upgrades', { keepLast: 1, retentionDays: 7 })).pending.length, 1);
+  await verifyUpgrade(first.prepared);
+  const plan = await pruneUpgrades(root + '-upgrades', { keepLast: 1, retentionDays: 7 }, { dryRun: false, now: Date.now() + 8 * 86400000 });
+  assert.deepEqual(plan.remove.map(p => path.basename(p)), [path.basename(first.prepared)]);
 });

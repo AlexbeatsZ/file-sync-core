@@ -13,7 +13,7 @@ import { byteRange, createUploadHandler } from './uploads.js';
 import { createMaintenance } from './maintenance.js';
 export { BackupRepository, lifecyclePolicy, lifecycleDefaults } from './backup.js';
 export { lifecycleCli } from './admin.js';
-export { pruneUpgrades, verifyUpgrade } from './upgrade.js';
+export { pruneUpgrades, verifyUpgrade, prepareUpgrade } from './upgrade.js';
 
 export const hashPattern = /^[a-f0-9]{64}(?![\s\S])/;
 export const idPattern = /^[A-Za-z0-9_-]{16,80}(?![\s\S])/;
