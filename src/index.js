@@ -272,11 +272,18 @@ export async function createFileSyncServer(options) {
       }
       if (request.method === 'GET') {
         if (url.pathname === `${routePrefix}/manifest/pages`) {
-          await pages('manifest', url.searchParams, state.manifest, response, json);
+          const pending = commits.then(() => pages('manifest', url.searchParams, state.manifest, response, json));
+          commits = pending.catch(() => {});
+          await pending;
           return;
         }
         if (url.pathname === `${routePrefix}/changes`) {
-          await pages('changes', url.searchParams, state.manifest, response, json);
+          // First-page boundary I/O must finish before GC takes its snapshot pins.
+          // Otherwise a page begun before maintenance could publish a new snapshot
+          // after GC captured the old reference set.
+          const pending = commits.then(() => pages('changes', url.searchParams, state.manifest, response, json));
+          commits = pending.catch(() => {});
+          await pending;
           return;
         }
       }
