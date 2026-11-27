@@ -6,7 +6,7 @@
 
 # Current State
 
-- Version 0.3.0 adds bounded server lifecycle on top of 0.2.0: independent verified compressed recovery snapshots, calendar/capacity retention, serialized history/blob/upload GC and admin/restore exports. Standalone consumers opt in; embedding callers preserve their original defaults.
+- Version 0.3.3 adds bounded server lifecycle on top of 0.2.0: independent verified compressed recovery snapshots, calendar/capacity retention, serialized history/blob/upload GC and admin/restore exports. Standalone consumers opt in; embedding callers preserve their original defaults.
 - Version 0.2.0 adds stable snapshot/delta pages, blob ranges, resumable uploads, and
   a packaged cross-language fixture. The original v1 commit, state, receipts and locks
   retain their compatibility contract. Public repository: AlexbeatsZ/file-sync-core.
@@ -18,7 +18,7 @@
 
 # Build / Run / Test
 
-- Node >=22. `npm test` runs built-in node:test on disposable Temp/.agents data only.
+- Node >=22. Current core: 38 isolated tests and offline package smoke passed. `npm test` runs built-in node:test on disposable Temp/.agents data only.
 - No compilation or dependency installation is needed. `npm pack` produces the library.
 - `node scripts/benchmark-pagination.mjs` measures whole-state writes and discovery transfer on synthetic data.
 - Preserve one current pack artifact under artifacts/current; never include private data.
