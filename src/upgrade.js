@@ -15,7 +15,7 @@ export async function pruneUpgrades(directory, policy, { dryRun = true, now = Da
     if (!info.isDirectory() || info.isSymbolicLink()) throw new Error('Invalid upgrade directory');
     const receipt = JSON.parse(await readFile(path.join(folder, 'upgrade.json'), 'utf8'));
     if (receipt.format !== 1 || !Number.isFinite(receipt.createdAt)) throw new Error('Invalid upgrade receipt');
-    records.push({ folder, ...receipt });
+    records.push({ ...receipt, folder });
   }
   records.sort((a, b) => b.createdAt - a.createdAt);
   let recent = 0;

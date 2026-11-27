@@ -139,3 +139,18 @@ test('normal upgrade snapshots only program/config, refuses an active writer and
   const plan = await pruneUpgrades(root + '-upgrades', { keepLast: 1, retentionDays: 7 }, { dryRun: false, now: Date.now() + 8 * 86400000 });
   assert.deepEqual(plan.remove.map(p => path.basename(p)), [path.basename(first.prepared)]);
 });
+
+test('recent resumable bytes protect their older session metadata from GC', async t => {
+  const root = await temporary(t), service = await listen(t, root, { lifecycle: {} });
+  t.after(() => import('node:fs/promises').then(fs => fs.rm(root + '-backups', { recursive: true, force: true })));
+  const hash = digest('partial transfer');
+  await mkdir(path.join(root, 'uploads'));
+  const meta = path.join(root, 'uploads', hash + '.json'), part = path.join(root, 'uploads', hash + '.part');
+  await writeFile(meta, '16'); await writeFile(part, 'partial');
+  const old = new Date(Date.now() - 48 * 3600000); await utimes(meta, old, old);
+  assert.equal((await service.maintenance('cleanup', true)).uploads, 0);
+  await service.maintenance('cleanup', false);
+  assert((await stat(meta)).isFile());
+  const progress = await (await request(service, 'uploads/' + hash)).json();
+  assert.deepEqual(progress, { offset: 7, total: 16, complete: false });
+});

@@ -43,8 +43,15 @@ export function createMaintenance({ root, configuration, getState, replaceState,
     for (const hash of referenced) if (!present.has(hash)) throw new Error('Retained manifest references a missing blob');
     const candidates = blobs.filter(f => !referenced.has(f.name) && !pins.has(f.name) &&
       now - f.mtimeMs > policy.garbageCollection.gracePeriodHours * 3600000);
-    const staleUploads = (await regularFiles(path.join(root, 'uploads'), /^[a-f0-9]{64}\.(part|json)$/))
-      .filter(f => !pins.has(f.name.slice(0, 64)) && now - f.mtimeMs > policy.garbageCollection.gracePeriodHours * 3600000);
+    const uploadFiles = await regularFiles(path.join(root, 'uploads'), /^[a-f0-9]{64}\.(part|json)$/);
+    const uploadGroups = new Map();
+    for (const f of uploadFiles) {
+      const hash = f.name.slice(0, 64);
+      if (!uploadGroups.has(hash)) uploadGroups.set(hash, []);
+      uploadGroups.get(hash).push(f);
+    }
+    const staleUploads = [...uploadGroups].filter(([hash, files]) => !pins.has(hash) &&
+      files.every(f => now - f.mtimeMs > policy.garbageCollection.gracePeriodHours * 3600000)).flatMap(([, files]) => files);
     const receiptGroups = new Map();
     for (const [key, value] of Object.entries(state.receipts)) {
       const device = key.split(':')[0];
@@ -137,10 +144,11 @@ export function createMaintenance({ root, configuration, getState, replaceState,
   async function due() {
     await ready;
     const now = new Date(), day = now.toLocaleDateString('en-CA');
+    if (last?.ok === false && now.getTime() - last.at < 3600000) return null;
     if (policy.garbageCollection.enabled && now.getTime() - lastGc >= policy.garbageCollection.intervalHours * 3600000) return 'cleanup';
     if (policy.backup.enabled && day !== lastBackupDay &&
         now.toTimeString().slice(0, 5) >= policy.backup.schedule) return 'backup';
     return null;
   }
-  return { run, due, repository, policy };
+  return { run, due, repository, policy, ready };
 }

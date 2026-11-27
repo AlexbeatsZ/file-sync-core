@@ -205,6 +205,7 @@ export async function createFileSyncServer(options) {
         catch (e) { storageFailed = true; throw e; }
       },
     });
+    await maintenance?.ready;
   } catch (e) { await release(); throw e; }
   const runMaintenance = (action, dryRun = true) => {
     const pending = commits.then(async () => {
