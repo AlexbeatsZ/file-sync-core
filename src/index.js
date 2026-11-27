@@ -3,13 +3,17 @@
 import http from 'node:http';
 import path from 'node:path';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, readFile, rename, open, stat, unlink, rmdir } from 'node:fs/promises';
+import { mkdir, readFile, rename, open, stat, unlink, rmdir, utimes } from 'node:fs/promises';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { getSystemErrorMap } from 'node:util';
 import { createPageHandler } from './pages.js';
 import { byteRange, createUploadHandler } from './uploads.js';
+import { createMaintenance } from './maintenance.js';
+export { BackupRepository, lifecyclePolicy, lifecycleDefaults } from './backup.js';
+export { lifecycleCli } from './admin.js';
+export { pruneUpgrades, verifyUpgrade } from './upgrade.js';
 
 export const hashPattern = /^[a-f0-9]{64}(?![\s\S])/;
 export const idPattern = /^[A-Za-z0-9_-]{16,80}(?![\s\S])/;
@@ -186,6 +190,35 @@ export async function createFileSyncServer(options) {
   let closePromise;
   let activeRequests = 0;
   let drainRequests;
+  const blobPins = new Map();
+  const pin = hash => blobPins.set(hash, (blobPins.get(hash) ?? 0) + 1);
+  const unpin = hash => { const n = blobPins.get(hash) - 1; if (n) blobPins.set(hash, n); else blobPins.delete(hash); };
+  let maintenanceActive = false;
+  let maintenanceTimer;
+  let maintenancePending = false;
+  let maintenance;
+  try {
+    if (options.lifecycle !== undefined) maintenance = createMaintenance({
+      root, configuration: options.lifecycle, getState: () => state, checkManifest, pins: blobPins,
+      replaceState: async next => {
+        try { await atomicJson(statePath, next); state = next; }
+        catch (e) { storageFailed = true; throw e; }
+      },
+    });
+  } catch (e) { await release(); throw e; }
+  const runMaintenance = (action, dryRun = true) => {
+    const pending = commits.then(async () => {
+      if (storageFailed || closing) throw new Error('Server is unavailable for maintenance');
+      if (!maintenance) throw new Error('Lifecycle management is not configured');
+      maintenanceActive = true;
+      const snapshotPins = pages.references();
+      for (const hash of snapshotPins) pin(hash);
+      try { return options.maintenanceActions?.[action] ? await options.maintenanceActions[action](dryRun) : await maintenance.run(action, dryRun); }
+      finally { for (const hash of snapshotPins) unpin(hash); maintenanceActive = false; }
+    });
+    commits = pending.catch(() => {});
+    return pending;
+  };
   const expectedToken = Buffer.from(`Bearer ${token}`);
   const json = (response, status, body) => {
     if (response.destroyed) return;
@@ -216,6 +249,22 @@ export async function createFileSyncServer(options) {
         json(response, 503, { error: 'storage_failure' });
         return;
       }
+      if (url.pathname === `${routePrefix}/maintenance` && maintenance) {
+        if (request.method === 'GET') { json(response, 200, await runMaintenance('status')); return; }
+        if (request.method === 'POST') {
+          const chunks = []; let length = 0;
+          for await (const c of request) { length += c.length; if (length <= 4096) chunks.push(c); }
+          let body;
+          try { body = length <= 4096 ? JSON.parse(Buffer.concat(chunks)) : null; } catch { body = null; }
+          if (!body || !['cleanup', 'backup', ...Object.keys(options.maintenanceActions ?? {})].includes(body.action) || typeof body.dryRun !== 'boolean') {
+            json(response, 400, { error: 'invalid_maintenance_request' }); return;
+          }
+          json(response, 200, await runMaintenance(body.action, body.dryRun)); return;
+        }
+      }
+      if (maintenanceActive && url.pathname !== `${routePrefix}/manifest` && !url.pathname.endsWith('/commit')) {
+        json(response, 503, { error: 'maintenance_busy' }); return;
+      }
       if (url.pathname === `${routePrefix}/manifest` && request.method === 'GET') {
         json(response, 200, state.manifest);
         return;
@@ -234,6 +283,7 @@ export async function createFileSyncServer(options) {
       const uploadHash = url.pathname.startsWith(uploadPrefix) ? url.pathname.slice(uploadPrefix.length) : '';
       if (hashPattern.test(uploadHash) && ['GET', 'PUT'].includes(request.method)) {
         await uploads(request, response, uploadHash, json);
+        await utimes(path.join(root, 'blobs', uploadHash), new Date(), new Date()).catch(e => { if (e.code !== 'ENOENT') throw e; });
         return;
       }
       const blobPrefix = `${routePrefix}/blobs/`;
@@ -298,6 +348,7 @@ export async function createFileSyncServer(options) {
               await stat(blobPath);
             }
             await syncDirectory(path.dirname(blobPath));
+            await utimes(blobPath, new Date(), new Date());
             json(response, 200, { hash: blobHash });
           } finally {
             await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; });
@@ -388,7 +439,7 @@ export async function createFileSyncServer(options) {
             return;
           }
           const receipt = { workspaceId: manifest.workspaceId, operationId: body.operationId, revision: next.manifest.revision, files };
-          next.receipts[key] = { fingerprint, receipt };
+          next.receipts[key] = { fingerprint, receipt, createdAt: Date.now() };
           await atomicJson(path.join(root, 'history', `${manifest.revision}.json`), manifest);
           try { await atomicJson(statePath, next); }
           catch (error) {
@@ -417,8 +468,11 @@ export async function createFileSyncServer(options) {
       return;
     }
     activeRequests++;
+    const hash = request.url?.match(/\/(?:blobs|uploads)\/([a-f0-9]{64})(?:\?|$)/)?.[1];
+    if (hash) pin(hash);
     try { await handleRequest(request, response); }
     finally {
+      if (hash) unpin(hash);
       activeRequests--;
       if (!activeRequests) drainRequests?.();
     }
@@ -426,10 +480,23 @@ export async function createFileSyncServer(options) {
   server.requestTimeout = 10 * 60 * 1000;
   server.headersTimeout = 30000;
 
+  if (maintenance) {
+    maintenanceTimer = setInterval(async () => {
+      if (closing || maintenancePending) return;
+      maintenancePending = true;
+      try { const action = await maintenance.due(); if (action) await runMaintenance(action, false); }
+      catch (e) { reportError(e); console.error('File sync lifecycle maintenance failed; inspect authenticated maintenance status'); }
+      finally { maintenancePending = false; }
+    }, 60000);
+    maintenanceTimer.unref();
+  }
+
   return {
     server,
+    maintenance: runMaintenance,
     close: () => closePromise ??= (async () => {
       closing = true;
+      clearInterval(maintenanceTimer);
       if (server.listening) {
         await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
       }

@@ -3,7 +3,7 @@
 Status: API frozen 2026-10-30; implementation verified 2026-10-31 (America/New_York).
 Project: C:/Users/Meta/Project/Scripts/JavaScript/file-sync-core.
 ES modules, Node >=22, zero runtime dependencies, MIT. No CLI, listener binding,
-configuration discovery, product path rules, TLS, gateway, service installation or GC.
+configuration discovery, product path rules, TLS, gateway, service installation or product configuration discovery.
 
 ## Exports
 
@@ -162,3 +162,18 @@ unchanged fields. `plan` cases exercise common path decisions and explicit block
 Fault traces exercise partial conflict resolution and restart, last-page advancement,
 preservation of concurrent file edits, and original outbox replay. Product adapters
 supply real paths, group boundaries and editor integration for these normalized traces.
+
+
+## Server data lifecycle (0.3.0)
+
+`createFileSyncServer({lifecycle:{backup,history,garbageCollection}})` enables independent recovery snapshots and maintenance. Defaults: history 100 revisions/30 days (both limits); per-device receipts 1000/30 days for timestamped receipts; GC every 24 hours with 24-hour upload grace; daily 04:00 local backup, 7 daily/4 weekly/3 monthly representatives, 20 GiB capacity, upgrades 1/7 days. Core callers omitting lifecycle retain the original non-maintaining embedding contract; product standalone CLIs enable the default policy. `backup.directory` must be outside the live root, defaults to `<root>-backups`; upgrade directory defaults to `<root>-upgrades`.
+
+History is not required for CAS: current path versions/tombstones stay authoritative. Expired delta bases return 410 and require a full snapshot. Receipt expiry never re-executes an old acknowledged write: its exact expected version is stale (including deleted paths); old callers receive 409 and reconcile. Legacy receipts have no trustworthy time, so only the count bound applies. Receipt hashes do not pin old content indefinitely. A restore contains current state/receipts and all currently referenced blobs, without historical manifests or incomplete transfers.
+
+Authenticated GET `/maintenance` reports current, history, blob, backup and reclaimable bytes plus policy and last success/failure. POST `/maintenance` requires `{action:'backup'|'cleanup',dryRun:boolean}`. The exported `service.maintenance(action,dryRun)` uses the same queue. Backup/GC and commits serialize. During maintenance new blob/discovery requests receive retryable 503; active streams and live pagination snapshots pin hashes. Recent uploads are kept for the grace interval, including repeated PUTs. Old resumable staging is collected only without an active transfer. Dry-run neither rewrites state nor removes files. Corrupt history or missing retained content aborts cleanup.
+
+Recovery snapshots use independent compressed content-addressed objects (no hardlinks to live blobs), immutable metadata, SHA-256/length verification and SQLite caller-provided consistent images. Identical content creates no extra snapshot. Rotation retains latest calendar representatives, plus latest verified and manually pinned snapshots. The byte cap can remove older calendar representatives, never latest/pinned; an unsatisfiable cap is an error. Verify kept points before deleting metadata, then sweep unreferenced backup objects. Repository locks serialize create/prune/restore; dead PID reclamation uses a separate atomic claim. A crash during claim requires operator inspection. Restore writes only a newly created destination. Backup verification hashes are required integrity checks, not routine production re-audits.
+
+`BackupRepository`, `lifecyclePolicy`, `lifecycleCli`, `pruneUpgrades` and `verifyUpgrade` are reusable exports. Upgrade pruning recognizes only `upgrade-*` folders with format-1 `upgrade.json`, a finite creation time and an explicit verifiedAt. Pending/failed upgrades are reported and never silently removed. A successful normal update stores old program/config, not the data root. Mark verified only after startup, current data and core API acceptance; expiry removes older points or points older than seven days, including the last point when expired.
+
+The design follows SQLite's Online Backup API consistency boundary and restic's separation of snapshot forgetting from unreferenced-object pruning; it does not change the sync wire protocol or chunk large note JSON in this release.

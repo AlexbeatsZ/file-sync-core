@@ -28,7 +28,7 @@ export function createPageHandler(root, checkManifest) {
     });
   }
 
-  return async (mode, params, manifest, response, json) => {
+  const handler = async (mode, params, manifest, response, json) => {
     const allowed = mode === 'changes' ? ['since', 'limit', 'cursor'] : ['limit', 'cursor'];
     const invalid = () => json(response, 400, { error: 'invalid_page_request' });
     const expired = () => json(response, 410, { error: 'cursor_expired' });
@@ -86,4 +86,13 @@ export function createPageHandler(root, checkManifest) {
     }
     servePage(response, json, id, snapshot, 0);
   };
+  handler.references = () => {
+    const result = new Set();
+    for (const [id, s] of snapshots) {
+      if (s.expires <= Date.now()) { snapshots.delete(id); continue; }
+      for (const [, entry] of s.entries) if (entry.hash) result.add(entry.hash);
+    }
+    return result;
+  };
+  return handler;
 }

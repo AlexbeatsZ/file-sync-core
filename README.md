@@ -102,3 +102,5 @@ performs a real authenticated round trip through the public package export.
 
 See [provenance.json](provenance.json), [third-party notices](THIRD_PARTY_NOTICES.md)
 and [the October log](docs/log/2026-10.md) and [the November log](docs/log/2026-11.md) for version origins and evidence.
+
+Server lifecycle 0.3.0: optional bounded history/receipts, serialized blob/upload GC, independent verified compressed recovery snapshots and rotation/restore/admin exports. See docs/design/api.md. Products own configuration and activation; existing embedding callers without lifecycle retain their original behavior.
