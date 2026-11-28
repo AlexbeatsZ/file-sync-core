@@ -6,6 +6,7 @@
 
 # Current State
 
+- Version 0.4.0 adds directory entries (`directory: true`, null hash) and allows case-only renames by applying case-insensitive uniqueness to live entries only. File fingerprints/receipts are unchanged. Shale sync v2 consumes it; Mojian folder hierarchy is a separate consumer task.
 - Version 0.3.4 adds bounded server lifecycle on top of 0.2.0: independent verified compressed recovery snapshots, calendar/capacity retention, serialized history/blob/upload GC and admin/restore exports. Standalone consumers opt in; embedding callers preserve their original defaults.
 - Version 0.2.0 adds stable snapshot/delta pages, blob ranges, resumable uploads, and
   a packaged cross-language fixture. The original v1 commit, state, receipts and locks

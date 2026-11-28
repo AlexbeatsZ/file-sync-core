@@ -6,7 +6,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { createFileSyncServer, hashPattern, idPattern } from '../src/index.js';
 import { validateManifest, validPath as webPath } from './fixtures/webobsidian-policy.js';
-import { token, prefix, digest, policies, op, change, temporary, listen, request, json, upload, worker, pause, cleanup } from './helpers.js';
+import { token, prefix, digest, policies, op, change, folder, temporary, listen, request, json, upload, worker, pause, cleanup } from './helpers.js';
 
 test('exported patterns are exact and have no stateful flags', () => {
   assert(hashPattern.test('a'.repeat(64)));
@@ -100,7 +100,9 @@ test('malformed and oversized commits never publish state', async t => {
     op(workspaceId, [change('library.json', 'a'.repeat(63))]),
     op(workspaceId, [change('library.json', null, -1)]),
     op(workspaceId, [change('library.json'), change('library.json')]),
-    op(workspaceId, [change('notebooks/b/pages/A.json'), change('notebooks/b/pages/a.json')]),
+    op(workspaceId, [folder('notebooks/b/pages/A'), folder('notebooks/b/pages/a')]),
+    op(workspaceId, [{ ...folder('notebooks/b'), hash: 'a'.repeat(64) }]),
+    op(workspaceId, [{ ...change('notebooks/b'), directory: false }]),
     op(workspaceId, Array.from({ length: 20001 }, () => change('library.json'))),
     { ...op(workspaceId, [change('library.json')]), deviceId: 'bad' },
   ];
@@ -147,15 +149,35 @@ test('CAS batches, original receipt replay, device scope, tombstones and histori
   assert.equal(await (await request(service, `blobs/${hash}`)).text(), 'immutable bytes');
 });
 
-test('concurrent CAS commits serialize; case aliases stay rejected including tombstones', async t => {
+test('concurrent CAS commits serialize; only live case aliases are rejected', async t => {
   const service = await listen(t, await temporary(t));
   const { workspaceId } = await json(service);
+  const hash = await upload(service, 'page');
   const name = 'notebooks/book/pages/A.json';
-  const results = await Promise.all(Array.from({ length: 8 }, () => request(service, 'commit', 'POST', op(workspaceId, [change(name)]))));
+  const results = await Promise.all(Array.from({ length: 8 }, () => request(service, 'commit', 'POST', op(workspaceId, [change(name, hash)]))));
   assert.equal(results.filter(result => result.status === 200).length, 1);
   assert.equal(results.filter(result => result.status === 409).length, 7);
-  assert.equal((await request(service, 'commit', 'POST', op(workspaceId, [change(name.toLowerCase())]))).status, 400);
+  // A second live spelling is rejected; a case-only rename retires the old spelling in the same batch.
+  assert.equal((await request(service, 'commit', 'POST', op(workspaceId, [change(name.toLowerCase(), hash)]))).status, 400);
   assert.equal((await json(service)).revision, 1);
+  const renamed = await json(service, 'commit', 'POST', op(workspaceId, [change(name, null, 1), change(name.toLowerCase(), hash)]));
+  assert.deepEqual(renamed.files, { [name]: { hash: null, version: 2 }, [name.toLowerCase()]: { hash, version: 2 } });
+  const manifest = await json(service);
+  assert.deepEqual(manifest.files[name], { hash: null, version: 2 });
+  assert.deepEqual(manifest.files[name.toLowerCase()], { hash, version: 2 });
+});
+
+test('directories are first-class entries with versions and tombstones', async t => {
+  const service = await listen(t, await temporary(t), { validPath: webPath, validateManifest() {} });
+  const { workspaceId } = await json(service);
+  const created = await json(service, 'commit', 'POST', op(workspaceId, [folder('notes/empty')]));
+  assert.deepEqual(created.files, { 'notes/empty': { hash: null, version: 1, directory: true } });
+  assert.deepEqual((await json(service)).files['notes/empty'], { hash: null, version: 1, directory: true });
+  assert.equal((await request(service, 'commit', 'POST', op(workspaceId, [folder('notes/empty')]))).status, 409);
+  const removed = await json(service, 'commit', 'POST', op(workspaceId, [change('notes/empty', null, 1)]));
+  assert.deepEqual(removed.files, { 'notes/empty': { hash: null, version: 2 } });
+  const recreated = await json(service, 'commit', 'POST', op(workspaceId, [folder('notes/empty', 2)]));
+  assert.deepEqual(recreated.files['notes/empty'], { hash: null, version: 3, directory: true });
 });
 
 test('consumer manifest policy rejects file/directory collisions atomically', async t => {

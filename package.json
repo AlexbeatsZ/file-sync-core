@@ -1,6 +1,6 @@
 {
   "name": "@alexbeatsz/file-sync-core",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Zero-dependency durable file synchronization server core",
   "author": "AlexbeatsZ",
   "repository": {

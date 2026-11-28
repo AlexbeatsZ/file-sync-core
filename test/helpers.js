@@ -15,6 +15,7 @@ export const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 export const policies = { validPath, validateManifest() {} };
 export const op = (workspaceId, changes) => ({ workspaceId, deviceId: 'isolated-device-id', operationId: randomUUID(), changes });
 export const change = (name, hash = null, expectedVersion = 0) => ({ path: name, expectedVersion, hash });
+export const folder = (name, expectedVersion = 0) => ({ path: name, expectedVersion, hash: null, directory: true });
 export const pause = () => new Promise(resolve => setImmediate(resolve));
 const cleanups = new Map();
 

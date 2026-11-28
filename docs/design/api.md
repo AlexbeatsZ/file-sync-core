@@ -59,8 +59,15 @@ await service.close();
 Authenticated routes below routePrefix: GET `/manifest`, GET/PUT `/blobs/<hash>`, POST `/commit`.
 JSON camelCase, unchanged v1 statuses/receipt bodies. Commit cap 4 MiB / 1-20000 changes.
 Exact-version CAS for every path; one revision per atomic batch; retain null-hash tombstones.
+Entries are files `{hash,version}`, directories `{hash:null,version,directory:true}` (0.4.0) or
+tombstones `{hash:null,version}`; a change may carry `directory:true` with a null hash. As in
+Syncthing, directories are versioned items, so empty folders, folder deletion and folder renames
+replicate instead of being inferred from files. Case-insensitive uniqueness applies to live
+entries only: a batch may retire `A` and create `a` (case-only rename); a second live spelling and
+duplicate exact paths in one batch are rejected. Consumer `validateManifest` owns shape rules.
 Receipt key remains `deviceId:operationId`. Fingerprint remains SHA-256 of JSON.stringify of
-`{workspaceId, changes}` with changes normalized to `{path,expectedVersion,hash}` and sorted
+`{workspaceId, changes}` with changes normalized to `{path,expectedVersion,hash}` (plus `directory:true`
+only for directory changes, so file fingerprints are unchanged) and sorted
 by case-sensitive path. Replay returns the ORIGINAL affected-path receipt before checking CAS;
 key reuse with different content returns 409 `operation_reused`. Receipt retention is unlimited.
 

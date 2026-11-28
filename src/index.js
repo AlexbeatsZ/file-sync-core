@@ -92,6 +92,15 @@ async function acquirePidLock(root) {
   }
 }
 
+/** Entries are files (`hash`), directories (`directory: true`, null hash) or tombstones (null hash). */
+function validEntryShape(entry) {
+  if (!entry || typeof entry !== 'object') return false;
+  if (entry.directory !== undefined && entry.directory !== true) return false;
+  if (entry.directory) return entry.hash === null;
+  return entry.hash === null || (typeof entry.hash === 'string' && hashPattern.test(entry.hash));
+}
+const isLive = entry => entry.hash !== null || entry.directory === true;
+
 function setFile(files, name, entry) {
   Object.defineProperty(files, name, { value: entry, enumerable: true, configurable: true, writable: true });
 }
@@ -133,14 +142,16 @@ export async function createFileSyncServer(options) {
         !manifest.files || typeof manifest.files !== 'object' || Array.isArray(manifest.files)) {
       throw new Error('Invalid stored manifest');
     }
-    const paths = new Set();
+    // Tombstones keep their exact name so a case-only rename can retire `A` and create `a`.
+    const live = new Set();
     for (const [name, entry] of Object.entries(manifest.files)) {
-      if (!acceptsPath(name) || paths.has(name.toLowerCase()) || !entry || typeof entry !== 'object' ||
-          !Number.isSafeInteger(entry.version) || entry.version <= 0 || entry.version > manifest.revision ||
-          (entry.hash !== null && (typeof entry.hash !== 'string' || !hashPattern.test(entry.hash)))) {
+      if (!acceptsPath(name) || !validEntryShape(entry) ||
+          !Number.isSafeInteger(entry.version) || entry.version <= 0 || entry.version > manifest.revision) {
         throw new Error('Invalid stored entry');
       }
-      paths.add(name.toLowerCase());
+      if (!isLive(entry)) continue;
+      if (live.has(name.toLowerCase())) throw new Error('Invalid stored entry');
+      live.add(name.toLowerCase());
     }
     rejectPromise(validateManifest(manifest), 'validateManifest');
   };
@@ -385,13 +396,15 @@ export async function createFileSyncServer(options) {
             !idPattern.test(body.deviceId) || !idPattern.test(body.operationId) ||
             !Array.isArray(body.changes) || !body.changes.length || body.changes.length > 20000 ||
             body.changes.some(change => !change || !acceptsPath(change.path) ||
-              !Number.isSafeInteger(change.expectedVersion) || change.expectedVersion < 0 ||
-              (change.hash !== null && (typeof change.hash !== 'string' || !hashPattern.test(change.hash)))) ||
-            new Set(body.changes.map(change => change.path.toLowerCase())).size !== body.changes.length) {
+              !Number.isSafeInteger(change.expectedVersion) || change.expectedVersion < 0 || !validEntryShape(change)) ||
+            new Set(body.changes.map(change => change.path)).size !== body.changes.length ||
+            new Set(body.changes.filter(isLive).map(change => change.path.toLowerCase())).size !== body.changes.filter(isLive).length) {
           json(response, 400, { error: 'invalid_commit' });
           return;
         }
-        const changes = body.changes.map(({ path: name, expectedVersion, hash }) => ({ path: name, expectedVersion, hash }))
+        // `directory` is omitted for files so v1 operation fingerprints and receipts stay byte-identical.
+        const changes = body.changes.map(({ path: name, expectedVersion, hash, directory }) =>
+          directory ? { path: name, expectedVersion, hash, directory: true } : { path: name, expectedVersion, hash })
           .sort((first, second) => first.path < second.path ? -1 : first.path > second.path ? 1 : 0);
         const fingerprint = createHash('sha256').update(JSON.stringify({ workspaceId: body.workspaceId, changes })).digest('hex');
         const key = `${body.deviceId}:${body.operationId}`;
@@ -411,8 +424,11 @@ export async function createFileSyncServer(options) {
               previous.fingerprint === fingerprint ? previous.receipt : { error: 'operation_reused' });
             return;
           }
-          const aliases = new Map(Object.keys(manifest.files).map(name => [name.toLowerCase(), name]));
-          if (changes.some(change => aliases.has(change.path.toLowerCase()) && aliases.get(change.path.toLowerCase()) !== change.path)) {
+          // A different spelling may only become live when this batch retires the current live spelling.
+          const retired = new Set(changes.filter(change => !isLive(change)).map(change => change.path));
+          const aliases = new Map(Object.entries(manifest.files).filter(([name, entry]) => isLive(entry) && !retired.has(name))
+            .map(([name]) => [name.toLowerCase(), name]));
+          if (changes.some(change => isLive(change) && aliases.has(change.path.toLowerCase()) && aliases.get(change.path.toLowerCase()) !== change.path)) {
             json(response, 400, { error: 'invalid_path' });
             return;
           }
@@ -437,7 +453,8 @@ export async function createFileSyncServer(options) {
           next.manifest.revision++;
           const files = {};
           for (const change of changes) {
-            const entry = { hash: change.hash, version: next.manifest.revision };
+            const entry = change.directory ? { hash: null, version: next.manifest.revision, directory: true }
+              : { hash: change.hash, version: next.manifest.revision };
             setFile(files, change.path, entry);
             setFile(next.manifest.files, change.path, entry);
           }
